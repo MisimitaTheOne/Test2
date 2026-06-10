@@ -4,12 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.example.project.entity.User;           // Thêm import này
-import org.example.project.repository.UserRepository; // Thêm import này
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,17 +17,16 @@ import java.util.List;
 public class JwtFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
-    private final UserDetailsService userDetailsService;   // Thêm dòng này
+    private final CustomUserDetailsService customUserDetailsService;
 
     private static final List<String> PUBLIC_URLS = List.of(
             "/api/auth/",
             "/api/v1/kyc/"
     );
 
-    // Sửa constructor để inject UserDetailsService
-    public JwtFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    public JwtFilter(JwtService jwtService, CustomUserDetailsService customUserDetailsService) {
         this.jwtService = jwtService;
-        this.userDetailsService = userDetailsService;
+        this.customUserDetailsService = customUserDetailsService;
     }
 
     @Override
@@ -52,15 +48,15 @@ public class JwtFilter extends OncePerRequestFilter {
             String username = jwtService.extractUsername(token);
 
             if (username != null && jwtService.isTokenValid(token, username)) {
-
-                // ==================== PHẦN SỬA CHÍNH Ở ĐÂY ====================
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                UsernamePasswordAuthenticationToken auth =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                // =================================================================
-
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                try {
+                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+                    UsernamePasswordAuthenticationToken auth =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                } catch (Exception e) {
+                    // Token invalid or user not found
+                    SecurityContextHolder.clearContext();
+                }
             }
         }
 
